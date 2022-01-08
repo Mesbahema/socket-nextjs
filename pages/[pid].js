@@ -3,23 +3,26 @@ import { Button, Grid, Paper, TextField } from '@mui/material'
 // import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
+import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import shortid from 'shortid';
 import io from 'socket.io-client'
 
-const MessageComponent = styled.div({
+const MessageComponent = styled.div(({inComing}) => ({
   width: 'fit-content',
-  backgroundColor: 'blue',
+  marginRight: 'auto',
   borderRadius: '5px',
   display: 'flex',
   alignItems: 'center',
   padding: '2px 5px 5px 5px',
   color: 'white',
-  margin: '5px'
-})
-export default function Home() {
+  margin: '5px',
+  backgroundColor: inComing ? 'green' : 'blue',
+  marginLeft: inComing ? 'auto' : ''
+}))
+export default function Home({pid}) {
   const initialValues = {
-    message: '',
+    message: {},
     room: ''
   }
   const [values, setValues] = useState(initialValues)
@@ -32,20 +35,36 @@ export default function Home() {
   }
 
   const onSend = () => {
-    console.log(messages)
-    setMessages([...messages, values.message])
-    socket.emit('send-message', values.message)
+    setMessages([...messages, {
+      content: values.message,
+      inComing: false
+    }])
+    socket.emit('send-message', values.message , pid)
+  }
+  const onJoin = () => {
+    socket.emit('join-room', values.room , message => {
+      setMessages([...messages, {
+        content: message,
+        inComing: false
+      }])
+    })
   }
   useEffect(() => {
-    if(newMessage) setMessages([...messages, newMessage])
+    if (newMessage) setMessages([...messages, {
+      content: newMessage,
+      inComing: true
+    }])
   }, [newMessage])
 
   useEffect(() => {
     fetch('/api/socketio').finally(() => {
       if (socket) {
         socket.on('connect', () => {
-          setMessages([...messages, `you connected with id: ${socket.id}`])
-          socket.on('recieve-message', (message)=> {
+          setMessages([...messages, {
+            content: `you connected with id: ${socket.id}`,
+            inComing: false
+          }])
+          socket.on(`recieve-message-${pid}`, (message) => {
             setNewMessage(message)
           })
         })
@@ -64,19 +83,21 @@ export default function Home() {
         <Box
           sx={{
             display: 'flex',
+            flexDirection: 'column',
             flexWrap: 'wrap',
             '& > :not(style)': {
               marginTop: 2,
               width: '100%',
               height: '300px',
+              overflowY: 'auto'
             },
           }}
         >
           <Paper elevation={4} >
             {
-              messages.map(message => (
-                <MessageComponent key={shortid.generate()}>
-                  {message}
+              messages.map(item => (
+                <MessageComponent inComing={item.inComing} key={shortid.generate()}>
+                  {item.content}
                 </MessageComponent>))
             }
 
@@ -93,10 +114,17 @@ export default function Home() {
             <TextField name="room" onChange={onChange} value={values.room} fullWidth id="standard-basic" variant="outlined" placeholder='insert the room' />
           </Grid>
           <Grid item xs={3}>
-            <Button fullWidth variant="contained">Join</Button>
+            <Button onClick={onJoin} fullWidth variant="contained">Join</Button>
           </Grid>
         </Grid>
       </Container>
     </>
   )
+}
+
+export async function getServerSideProps({params: {pid}}) {
+
+  return {
+    props: { pid: pid }, // will be passed to the page component as props
+  }
 }

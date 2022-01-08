@@ -7,9 +7,14 @@ const ioHandler = (req, res) => {
         const io = new Server(res.socket.server)
 
         io.on('connection', socket => {
-            socket.on('send-message', (message) => {
-                console.log(message)
-                socket.broadcast.emit('recieve-message', message)
+            socket.on('send-message', (message, pid) => {
+                console.log('message', message, 'pid', pid)
+                socket.broadcast.emit(`recieve-message-${pid}`, message)
+            })
+
+            socket.on('join-room', (room, cb) => {
+                socket.join(room)
+                cb(`joined ${room}`)
             })
         })
 
@@ -19,7 +24,7 @@ const ioHandler = (req, res) => {
             socket.emit('recieve-message', message)
         })
     }
-    res.end()
+    return res.status(200).json({ name: 'John Doe' })
 }
 
 export const config = {
